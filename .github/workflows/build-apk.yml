@@ -37,3 +37,11 @@ jobs:
           name: myra-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Publish APK as release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          TAG="build-${{ github.run_number }}"
+          gh release create "$TAG" "$APK" --title "MYRA APK $TAG" --notes "Debug APK built automatically via GitHub Actions."
