@@ -1,0 +1,11 @@
+# Gradle
+.gradle/
+build/
+# Local config
+local.properties
+# IDE
+.idea/
+.vscode/
+*.iml
+# OS
+.DS_Store
