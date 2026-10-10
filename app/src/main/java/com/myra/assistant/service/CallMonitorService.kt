@@ -146,7 +146,7 @@ class CallMonitorService : Service(), TextToSpeech.OnInitListener {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("MYRA Running")
             .setContentText("Monitoring calls")
-            .setSmallIcon(R.mipmap.img)
+            .setSmallIcon(R.drawable.ic_myra_notif)
             .setOngoing(true)
             .build()
 
