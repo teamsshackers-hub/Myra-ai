@@ -43,7 +43,8 @@ jobs:
       - name: Build debug APK
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug --stacktrace
+          set -o pipefail
+          ./gradlew :app:assembleDebug --stacktrace 2>&1 | tee /tmp/build.log
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -68,17 +69,8 @@ jobs:
           {
             echo "=== env ==="
             echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
-            echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-<unset>}"
             echo "JAVA_HOME=${JAVA_HOME:-<unset>}"
-            echo "=== sdk root listing ==="
-            ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}" 2>&1 || true
-            echo "=== cmdline-tools ==="
-            ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools" 2>&1 || true
-            echo "=== find sdkmanager ==="
-            find /usr/local/lib/android -maxdepth 4 -name "sdkmanager*" 2>&1 | head -10 || true
-            echo "=== java ==="
-            java -version 2>&1 || true
-            echo "=== gradle wrapper ==="
-            ls -la gradle/wrapper/ 2>&1 || true
+            echo "=== GRADLE BUILD LOG (tail) ==="
+            tail -c 12000 /tmp/build.log 2>&1 || echo "no build log"
           } > /tmp/diag.txt 2>&1
-          gh issue create --title "Build diagnostics run ${{ github.run_number }}" --body-file /tmp/diag.txt || true
+          gh issue create --title "Build diagnostics run ${{ github.run_number }}" --body-file /tmp/diag.txt || echo "issue create failed"
