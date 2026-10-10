@@ -20,9 +20,24 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          SDKMGR=$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 2 -name sdkmanager | head -1)
+          set -x
+          echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-<unset>}"
+          SDK_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          SDKMGR=""
+          for d in "$SDK_HOME/cmdline-tools/latest/bin" "$SDK_HOME/cmdline-tools/bin" "$SDK_HOME/tools/bin"; do
+            if [ -x "$d/sdkmanager" ]; then SDKMGR="$d/sdkmanager"; break; fi
+          done
+          if [ -z "$SDKMGR" ]; then
+            SDKMGR=$(find "${SDK_HOME:-/usr/local/lib/android/sdk}" -name sdkmanager -type f 2>/dev/null | head -1)
+          fi
+          if [ -z "$SDKMGR" ] || [ ! -x "$SDKMGR" ]; then
+            echo "FATAL: sdkmanager not found. Searching wider:"
+            find / -maxdepth 7 -name sdkmanager -type f 2>/dev/null | head -5
+            exit 1
+          fi
           echo "Using sdkmanager: $SDKMGR"
-          yes | "$SDKMGR" --licenses > /dev/null
+          yes | "$SDKMGR" --licenses > /dev/null || true
           "$SDKMGR" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
       - name: Build debug APK
@@ -44,3 +59,26 @@ jobs:
           APK=app/build/outputs/apk/debug/app-debug.apk
           TAG="build-${{ github.run_number }}"
           gh release create "$TAG" "$APK" --title "MYRA APK $TAG" --notes "Debug APK built automatically via GitHub Actions."
+
+      - name: Report diagnostics on failure
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "=== env ==="
+            echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
+            echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-<unset>}"
+            echo "JAVA_HOME=${JAVA_HOME:-<unset>}"
+            echo "=== sdk root listing ==="
+            ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}" 2>&1 || true
+            echo "=== cmdline-tools ==="
+            ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools" 2>&1 || true
+            echo "=== find sdkmanager ==="
+            find /usr/local/lib/android -maxdepth 4 -name "sdkmanager*" 2>&1 | head -10 || true
+            echo "=== java ==="
+            java -version 2>&1 || true
+            echo "=== gradle wrapper ==="
+            ls -la gradle/wrapper/ 2>&1 || true
+          } > /tmp/diag.txt 2>&1
+          gh issue create --title "Build diagnostics run ${{ github.run_number }}" --body-file /tmp/diag.txt || true
