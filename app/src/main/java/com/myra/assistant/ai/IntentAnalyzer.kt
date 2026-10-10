@@ -55,17 +55,36 @@ object IntentAnalyzer {
 
             OPEN_PATTERNS.any { lower.startsWith(it) || lower.contains("$it ") } -> {
                 val appName = extractAfter(lower, OPEN_PATTERNS)
-                VoiceCommand(text, CommandType.OPEN_APP, mapOf("app" to appName))
+                // If user said e.g. "youtube kholo <song>", prefer search over plain open
+                val ytQuery = extractMediaQuery(lower, YOUTUBE_PATTERNS)
+                if (lower.contains("youtube") && ytQuery.isNotEmpty()) {
+                    VoiceCommand(text, CommandType.YOUTUBE_PLAY, mapOf("query" to ytQuery))
+                } else {
+                    val spQuery = extractMediaQuery(lower, SPOTIFY_PATTERNS)
+                    if (lower.contains("spotify") && spQuery.isNotEmpty()) {
+                        VoiceCommand(text, CommandType.SPOTIFY_PLAY, mapOf("query" to spQuery))
+                    } else {
+                        VoiceCommand(text, CommandType.OPEN_APP, mapOf("app" to appName))
+                    }
+                }
             }
 
             YOUTUBE_PATTERNS.any { lower.contains(it) } -> {
-                val song = extractAfter(lower, YOUTUBE_PATTERNS)
-                VoiceCommand(text, CommandType.YOUTUBE_PLAY, mapOf("query" to song))
+                val song = extractMediaQuery(lower, YOUTUBE_PATTERNS)
+                if (song.isEmpty()) {
+                    VoiceCommand(text, CommandType.OPEN_APP, mapOf("app" to "youtube"))
+                } else {
+                    VoiceCommand(text, CommandType.YOUTUBE_PLAY, mapOf("query" to song))
+                }
             }
 
             SPOTIFY_PATTERNS.any { lower.contains(it) } -> {
-                val song = extractAfter(lower, SPOTIFY_PATTERNS)
-                VoiceCommand(text, CommandType.SPOTIFY_PLAY, mapOf("query" to song))
+                val song = extractMediaQuery(lower, SPOTIFY_PATTERNS)
+                if (song.isEmpty()) {
+                    VoiceCommand(text, CommandType.OPEN_APP, mapOf("app" to "spotify"))
+                } else {
+                    VoiceCommand(text, CommandType.SPOTIFY_PLAY, mapOf("query" to song))
+                }
             }
 
             else -> VoiceCommand(text, CommandType.CONVERSATION)
@@ -116,6 +135,29 @@ object IntentAnalyzer {
             val idx = text.indexOf(p)
             if (idx != -1) {
                 return text.substring(idx + p.length).trim()
+            }
+        }
+        return ""
+    }
+
+    /**
+     * Extracts a media search query around YouTube/Spotify trigger words.
+     * Handles both "youtube par <song> lagao" (query after) and
+     * "<song> play on youtube" (query before). Strips filler/command words.
+     * Returns "" when the user only wants the app opened (e.g. "youtube kholo").
+     */
+    private fun extractMediaQuery(text: String, patterns: List<String>): String {
+        val fillers = Regex("\\b(kholo|khol|open|launch|start|karo|kar|do|par|pe|per|mein|me|ko|ki|ka|play|karke|lagao|lagado|chalao|chala|chalo|dikhao|sunao|bajao|on)\\b")
+        for (p in patterns) {
+            val idx = text.indexOf(p)
+            if (idx != -1) {
+                val after = text.substring(idx + p.length).trim()
+                val before = text.substring(0, idx).trim()
+                val candidate = if (after.isNotEmpty()) after else before
+                val cleaned = candidate.replace(fillers, " ")
+                    .replace(Regex("\\s+"), " ")
+                    .trim()
+                if (cleaned.isNotEmpty()) return cleaned
             }
         }
         return ""

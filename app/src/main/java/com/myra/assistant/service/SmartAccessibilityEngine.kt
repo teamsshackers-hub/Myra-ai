@@ -3,6 +3,7 @@
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.media.AudioManager
+import android.net.Uri
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import com.myra.assistant.accessibility.NodeFinder
@@ -10,6 +11,7 @@ import com.myra.assistant.automation.AppDetector
 import com.myra.assistant.automation.SmartAutomationAgent
 import com.myra.assistant.automation.ActionExecutor
 import com.myra.assistant.service.ScreenVisionAnalyzer
+import java.net.URLEncoder
 
 object SmartAccessibilityEngine {
 
@@ -35,6 +37,16 @@ object SmartAccessibilityEngine {
 
             cmd.startsWith("PLAY_MUSIC", true) ->
                 handlePlayMusic(cmd)
+
+            cmd.startsWith("YOUTUBE_PLAY", true) ->
+                playOnYouTube(
+                    cmd.removePrefix("YOUTUBE_PLAY").trim()
+                )
+
+            cmd.startsWith("SPOTIFY_PLAY", true) ->
+                playOnSpotify(
+                    cmd.removePrefix("SPOTIFY_PLAY").trim()
+                )
 
             cmd.startsWith("CLICK", true) ->
                 genericClick(
@@ -134,6 +146,67 @@ object SmartAccessibilityEngine {
             ?: return false
 
         return launchPackage(app.packageName, "PLAY_MUSIC")
+    }
+
+    private fun playOnYouTube(
+        query: String
+    ): Boolean {
+
+        if (query.isEmpty()) return handleOpenApp("OPEN_APP:youtube")
+
+        return try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val uri = Uri.parse("https://www.youtube.com/results?search_query=$encoded")
+            val svc = service ?: return false
+
+            // Prefer the YouTube app when installed, else fall back to browser
+            val ytIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                setPackage("com.google.android.youtube")
+            }
+            val useApp = try {
+                ytIntent.resolveActivity(svc.packageManager) != null
+            } catch (e: Exception) {
+                false
+            }
+            if (useApp) {
+                svc.startActivity(ytIntent)
+            } else {
+                svc.startActivity(
+                    Intent(Intent.ACTION_VIEW, uri).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                )
+            }
+            Log.d(TAG, "YOUTUBE_PLAY -> $query")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "YOUTUBE_PLAY failed: ${e.message}")
+            false
+        }
+    }
+
+    private fun playOnSpotify(
+        query: String
+    ): Boolean {
+
+        if (query.isEmpty()) return handleOpenApp("OPEN_APP:spotify")
+
+        return try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val uri = Uri.parse("https://open.spotify.com/search/$encoded")
+            val svc = service ?: return false
+            svc.startActivity(
+                Intent(Intent.ACTION_VIEW, uri).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            )
+            Log.d(TAG, "SPOTIFY_PLAY -> $query")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "SPOTIFY_PLAY failed: ${e.message}")
+            false
+        }
     }
 
     private fun findLaunchIntent(
