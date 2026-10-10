@@ -42,9 +42,9 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@mipmap/img"
+        android:icon="@mipmap/ic_launcher"
         android:label="MYRA"
-        android:roundIcon="@mipmap/img"
+        android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.Myra"
         android:usesCleartextTraffic="true"
