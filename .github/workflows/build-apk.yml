@@ -70,10 +70,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
-            echo "=== env ==="
-            echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
-            echo "JAVA_HOME=${JAVA_HOME:-<unset>}"
-            echo "=== GRADLE BUILD LOG (tail) ==="
-            tail -c 12000 /tmp/build.log 2>&1 || echo "no build log"
+            echo "=== WHAT WENT WRONG ==="
+            grep -B2 -A12 "What went wrong" /tmp/build.log 2>/dev/null | head -40 || true
+            echo ""
+            echo "=== KOTLIN/BUILD ERRORS ==="
+            grep -E "^e: |error: |FAILED" /tmp/build.log 2>/dev/null | sort -u | head -60 || true
           } > /tmp/diag.txt 2>&1
           gh issue create --title "Build diagnostics run ${{ github.run_number }}" --body-file /tmp/diag.txt || echo "issue create failed"
